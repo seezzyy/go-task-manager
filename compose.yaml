@@ -1,0 +1,46 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8080:9000"
+    environment:
+      HTTP_PORT: "9000"
+      SHUTDOWN_TIMEOUT: "10s"
+      DATABASE_URL: postgres://postgres:postgres@db:5432/taskmanager?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  migrate:
+    image: migrate/migrate:v4.20.1
+    volumes:
+      - ./db/migrations:/migrations:ro
+    command:
+      - "-path"
+      - "/migrations"
+      - "-database"
+      - "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable"
+      - "up"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  db:
+    image: postgres:17
+    ports:
+      - "127.0.0.1:5434:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-taskmanager}
+    volumes:
+      - taskmanager_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d taskmanager"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  taskmanager_data:
